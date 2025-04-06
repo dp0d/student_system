@@ -2,11 +2,12 @@ import sys
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QApplication, QTableWidget, QHeaderView, QCheckBox, \
     QTableWidgetItem
-from qfluentwidgets import CardWidget, PushButton, SearchLineEdit, TableWidget, setCustomStyleSheet
+from qfluentwidgets import CardWidget, PushButton, SearchLineEdit, TableWidget, setCustomStyleSheet, InfoBar
 
 from database.student_db import StudentDB
-from student.student_dialog import AddStudentDialog
-from utils.custom_style import ADD_BUTTON_STYLE, BATCH_DELETE_BUTTON_STYLE
+from student.student_dialog import AddStudentDialog, UpdateStudentDialog
+from utils.custom_style import ADD_BUTTON_STYLE, BATCH_DELETE_BUTTON_STYLE, UPDATE_BUTTON_STYLE, DELETE_BUTTON_STYLE
+from utils.ui_components import create_action_widget
 
 
 class StudentInterface(QWidget):
@@ -62,6 +63,22 @@ class StudentInterface(QWidget):
         dialog = AddStudentDialog(self)
         if dialog.exec():
             print("用户点击了确定按钮")
+            # 获取用户输入
+            student_info = dialog.get_student_info()
+            #
+            # 写入数据库
+            try:
+                with StudentDB() as db:
+                    if db.student_number_exists(student_info):
+                        InfoBar.error(title="添加失败",content="学号已经存在", parent=self, duration=3000)
+                    else:
+                        db.add_student(student_info)
+                        # 重新加载数据
+                        self.load_data()
+                        self.populate_table()
+                        InfoBar.success(title="添加成功", content=f"{student_info['name']}学生信息添加成功", parent=self, duration=3000)
+            except Exception as e:
+                InfoBar.error(title="添加失败", content=str(e),parent=self, duration=3000)
         else:
             print("用户点击了取消按钮")
 
@@ -95,6 +112,23 @@ class StudentInterface(QWidget):
             item = QTableWidgetItem(str(value))
             self.table_widget.setItem(row, col+1, item)
 
+        # 添加编辑删除按钮
+        action_widget =create_action_widget(
+            update_callback = lambda: self.update_student(student_info['student_id']),
+            delete_callback = lambda: self.delete_student(student_info['student_id']),
+        )
+        self.table_widget.setCellWidget(row, len(self.column_lis) +1, action_widget)
+
+    def update_student(self, student_id):
+
+        # 打开编辑对话框
+        dialog = UpdateStudentDialog(self)
+        if dialog.exec():
+            print("用户点击了编辑按钮")
+        else:
+            print("取消")
+    def delete_student(self,student_id):
+        print(f"删除的学生id是{student_id}")
 
 
 if __name__ == '__main__':
